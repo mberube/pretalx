@@ -2,8 +2,25 @@ from django.db import models
 from django.utils.functional import cached_property
 from django.utils.translation import gettext_lazy as _
 from django_scopes import ScopedManager
+from i18nfield.fields import I18nCharField
 
 from pretalx.common.urls import EventUrls
+
+
+class ScoreCategory(models.Model):
+    event = models.ForeignKey(to="event.Event", related_name="score_categories", on_delete=models.CASCADE)
+    name = I18nCharField()
+    weight = models.IntegerField(default=1)
+
+    objects = ScopedManager(event="event")
+
+
+class Score(models.Model):
+    category = models.ForeignKey(to=ScoreCategory, related_name="scores", on_delete=models.CASCADE)
+    value = models.IntegerField()
+    label = models.I18nCharField(null=True, blank=True)
+
+    objects = ScopedManager(event="category__event")
 
 
 class Review(models.Model):
@@ -14,8 +31,9 @@ class Review(models.Model):
     They can, but don't have to, include a score and a text.
 
     :param text: The review itself. May be empty.
-    :param score: The upper and lower bounds of this value are defined in an
-        event's settings.
+    :param score: This score is calculated from all the related ``scores``
+        and their weights. Do not set it directly, use the ``update_score``
+        method instead.
     :param override_vote: If this field is ``True`` or ``False``, it indicates
         that the reviewer has spent one of their override votes to emphasise
         their opinion of the review. It is ``None`` otherwise.
@@ -29,6 +47,7 @@ class Review(models.Model):
     )
     text = models.TextField(verbose_name=_("What do you think?"), null=True, blank=True)
     score = models.IntegerField(verbose_name=_("Score"), null=True, blank=True)
+    scores = models.ManyToManyField(null=True, blank=True)
     override_vote = models.BooleanField(default=None, null=True, blank=True)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
@@ -78,6 +97,10 @@ class Review(models.Model):
         # review_count values to 1.
         return queryset.order_by("review_count")
 
+    @classmethod
+    def calculate_score(cls, scores):
+        return sum(score.value * score.category.weight for score in scores)
+
     @cached_property
     def event(self):
         return self.submission.event
@@ -94,6 +117,14 @@ class Review(models.Model):
         return self.submission.event.settings.get(
             f"review_score_name_{self.score}"
         ) or str(self.score)
+
+    def update_score(self):
+        self.score = self.calculate_score(self.scores.all().select_related("category"))
+
+    def save(self, *args, update_score=True, **kwargs):
+        if update_score:
+            self.update_score()
+        return super().save(*args, **kwargs)
 
     class urls(EventUrls):
         base = "{self.submission.orga_urls.reviews}"
