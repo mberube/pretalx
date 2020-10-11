@@ -8,6 +8,7 @@ from django.core.files.base import ContentFile
 from django.db.models import F, Q
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
+from django_scopes.forms import SafeModelMultipleChoiceField
 from hierarkey.forms import HierarkeyForm
 from i18nfield.fields import I18nFormField, I18nTextarea
 from i18nfield.forms import I18nFormMixin, I18nModelForm
@@ -500,8 +501,13 @@ class ReviewPhaseForm(I18nModelForm):
 class ReviewScoreCategoryForm(I18nModelForm):
     new_scores = forms.CharField(required=False, initial="")
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, event=None, **kwargs):
+        self.event = event
         super().__init__(*args, **kwargs)
+        if not event.settings.use_tracks:
+            self.fields.pop("limit_tracks")
+        else:
+            self.fields["limit_tracks"].queryset = event.tracks.all()
         ids = self.data.get(self.prefix + "-new_scores")
         self.new_label_ids = ids.strip(",").split(",") if ids else []
         for label_id in self.new_label_ids:
@@ -566,4 +572,8 @@ class ReviewScoreCategoryForm(I18nModelForm):
             "weight",
             "required",
             "active",
+            "limit_tracks",
         )
+        field_classes = {
+            "limit_tracks": SafeModelMultipleChoiceField,
+        }

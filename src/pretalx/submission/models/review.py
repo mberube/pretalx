@@ -15,6 +15,11 @@ class ReviewScoreCategory(models.Model):
     weight = models.DecimalField(max_digits=4, decimal_places=1, default=1)
     required = models.BooleanField(default=False)
     active = models.BooleanField(default=True)
+    limit_tracks = models.ManyToManyField(
+        to="submission.Track",
+        verbose_name=_("Limit to tracks"),
+        blank=True,
+    )
 
     objects = ScopedManager(event="event")
 
