@@ -131,7 +131,7 @@ SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 CSP_DEFAULT_SRC = "'self'"
 CSP_SCRIPT_SRC = ("'self'",)
 CSP_STYLE_SRC = ("'self'", "'unsafe-inline'")
-CSP_IMG_SRC = ("'self'", "data:")
+CSP_IMG_SRC = ("'self'", "data:", SITE_URL)
 CSP_BASE_URI = "'none'"
 CSP_FORM_ACTION = "'self'"
 
